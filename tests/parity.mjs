@@ -30,7 +30,7 @@ const same = (a, b, tol) => (Number.isNaN(a) && Number.isNaN(b)) || Math.abs(a -
 
 function compareYear(year, refFile) {
   console.log(`\n== ${year} vs ${path.relative(ROOT, refFile)}`);
-  const r = M.compute(DATA, { year, month: cfg.default_store_month, brand: -1, format: -1, weights: cfg.weights });
+  const r = M.compute(DATA, { year, month: cfg.default_store_month, format: -1, weights: cfg.weights });
   const at = new Map(DATA.districts.code.map((c, i) => [c, i]));
   const ref = readCsv(refFile);
   if (ref.length !== 973) fail(`reference has ${ref.length} rows`);

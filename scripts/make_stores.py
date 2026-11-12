@@ -1,4 +1,4 @@
-"""Generates the DUMMY Arçelik / Beko store list (seeded, reproducible).
+"""Generates the DUMMY Arçelik store list (seeded, reproducible).
 Usage: python make_stores.py DATA_DIR"""
 import sys, numpy as np, pandas as pd
 D = sys.argv[1]; rng = np.random.default_rng(449)
@@ -22,7 +22,8 @@ months = pd.period_range('2008-01', '2026-10', freq='M')
 w = np.linspace(0.4, 1.6, len(months)); w /= w.sum()   # more openings in recent years
 for i in d.index:
     for k in range(int(n[i])):
-        brand = 'Arçelik' if rng.random() < 0.58 else 'Beko'
+        rng.random()  # former Arçelik / Beko draw: kept so the seeded sequence, and every other column, stays the same
+        brand = 'Arçelik'  # one brand only (Beko removed, Nov 2026)
         fmt = rng.choice(['Bayi', 'Mağaza', 'AVM'], p=[0.72, 0.16, 0.12] if d.sege_kademe[i] <= 2 else [0.88, 0.08, 0.04])
         op = months[rng.choice(len(months), p=w)]
         cl = ''

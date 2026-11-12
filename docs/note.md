@@ -2,18 +2,18 @@
 
 **ECON 449 · use case 08 · Ali Kaan Yurdacan · November 2026** · File: `whitespace_dashboard.html` (opens offline with a double click, EN / TR)
 
-**Question.** Where does Arçelik have demand without a store? For each of Türkiye's 973 districts the dashboard shows households, how well-off they are, how many homes are sold, and how many Arçelik / Beko stores serve them. Descriptive only: no forecast, no model, no optimisation.
+**Question.** Where does Arçelik have demand without a store? For each of Türkiye's 973 districts the dashboard shows households, how well-off they are, how many homes are sold, and how many Arçelik stores serve them. Descriptive only: no forecast, no model, no optimisation.
 
 ## What each page answers
 
 | Page | Answers | Main views |
 |---|---|---|
-| **Overview** | How does the store network cover households? Where are demand and stores? Which regions are under- or over-served? | 6 KPIs with formula tooltips; district bubble map (size = households, colour = score, red ring = white space); monthly housing sales and active stores; stores per 100k households by region vs the national line |
-| **Ranking & flags** | Which districts should we look at first? | Top-20 chart coloured by flag; four flag chips (click to filter); sortable, searchable table of all filtered districts with CSV export |
+| **Overview** | How does the store network cover households? Where are demand and stores? Which regions are under- or over-served? | 6 KPIs with formula tooltips; district bubble map (size = households, colour = score, red ring = white space; click a province to filter); "Where to look first" list of the top white-space districts; monthly housing sales and active stores; stores per 100k households by region vs the national line |
+| **Ranking & flags** | Which districts should we look at first? | Top-20 chart coloured by flag; flag chips that combine (districts with all selected flags, or any of them) with a "store / no store" filter; sortable, searchable table of all filtered districts with CSV export |
 | **District** | Why does a district score high, and what is there today? | Score components, 36-month housing sales vs the province's average district, active store list, peer districts of the province |
 | **Method & data** | How is every number computed? | Editable weights, flag rules, formulas, sources, assumptions, dummy-data notice |
 
-Filters (kept in the link): region, province, SEGE tier, brand, store format, year (2023–2025), store month (Jan 2023 – Oct 2026).
+Filters (kept in the link): region, province, SEGE tier, store format, year (2023–2025), store month (Jan 2023 – Oct 2026). Active filters show as removable chips. A filter set with no district, or no matching store, shows a message with one-click fixes instead of an empty map.
 
 ## Score (0–100) and flags
 

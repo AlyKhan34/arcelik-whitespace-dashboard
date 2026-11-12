@@ -35,7 +35,7 @@ CONFIG = {
 ROOT = Path(__file__).resolve().parent.parent
 N_DISTRICTS = 973
 N_MONTHS = 36
-BRANDS = ['Arçelik', 'Beko']
+BRAND = 'Arçelik'  # one brand only: there is no brand filter
 FORMATS = ['Bayi', 'Mağaza', 'AVM']
 
 
@@ -73,7 +73,7 @@ def load_and_check(data_dir):
     check(set(p.tuik_code) == set(d.tuik_code), 'district_points.csv: codes differ from districts.csv')
     check(s.store_id.is_unique, 'stores_dummy.csv: store_id not unique')
     check(s.tuik_code.isin(d.tuik_code).all(), 'stores_dummy.csv: store in unknown district')
-    check(set(s.brand) <= set(BRANDS), f'stores: unknown brand {set(s.brand) - set(BRANDS)}')
+    check((s.brand == BRAND).all(), f'stores: brand must be {BRAND} for every row, found {sorted(set(s.brand) - {BRAND})}')
     check(set(s.format) <= set(FORMATS), f'stores: unknown format {set(s.format) - set(FORMATS)}')
     check(len(geo.get('features', [])) == 81, 'provinces.geojson: expected 81 provinces')
     check(set(f['properties']['name'] for f in geo['features']) == set(d.il),
@@ -117,7 +117,6 @@ def pack(d, m, p, s, geo, periods):
         'config': CONFIG,
         'regions': regions,
         'sales_months': periods,
-        'brands': BRANDS,
         'formats': FORMATS,
         'districts': {
             'code': d.tuik_code.astype(int).tolist(),
@@ -139,7 +138,6 @@ def pack(d, m, p, s, geo, periods):
         'stores': {
             'id': s.store_id.tolist(),
             'district': s.tuik_code.map(order).astype(int).tolist(),
-            'brand': s.brand.map({b: i for i, b in enumerate(BRANDS)}).astype(int).tolist(),
             'format': s.format.map({f: i for i, f in enumerate(FORMATS)}).astype(int).tolist(),
             'open': s.open_month.map(month_int).tolist(),
             'close': [None if pd.isna(c) else month_int(c) for c in s.close_month],

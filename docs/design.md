@@ -4,6 +4,8 @@
 - **Owner:** Ali Kaan Yurdacan (individual work)
 - **Deadline:** Tuesday 17 November 2026, end of day (5-minute demo)
 - **Status:** data prepared and checked 12 Nov 2026; dashboard to be built from this file
+- **Change 12 Nov 2026 (owner's choice):** Beko removed. Every store in `stores_dummy.csv` is
+  Arçelik and there is no brand filter. The default numbers in section 10 do not change
 - **Scope rule from the brief:** descriptive analysis only. No forecasting, no ML, no optimisation
 
 ## How to build it (for Claude Code)
@@ -21,7 +23,7 @@ This file is the whole brief. Give it to Claude Code in this folder and say:
 
 Show **where Arçelik has demand without a store**. For each of Türkiye's 973 districts (ilçe):
 how many households live there, how well-off they are, how many homes are being sold, and how
-many Arçelik / Beko stores serve them. A simple, documented score ranks the districts. Rule-based
+many Arçelik stores serve them. A simple, documented score ranks the districts. Rule-based
 flags mark the ones that need attention, above all **high-score districts with no store**.
 
 **Questions the dashboard answers**
@@ -38,7 +40,7 @@ flags mark the ones that need attention, above all **high-score districts with n
 
 | # | Criterion | Check |
 |---|---|---|
-| S1 | Default view (year 2025, all brands, all formats, stores as of 2026-10) shows exactly the reference numbers in section 10 | Parity test against `data/district_metrics_2025.csv` |
+| S1 | Default view (year 2025, all formats, stores as of 2026-10) shows exactly the reference numbers in section 10 | Parity test against `data/district_metrics_2025.csv` |
 | S2 | Every filter changes every KPI, chart and the table consistently | Playwright: change each filter, compare totals |
 | S3 | The file opens offline (no network requests) | Playwright with network disabled |
 | S4 | Usable at 1280 px and 390 px, EN and TR, no horizontal scroll | Screenshots |
@@ -52,7 +54,7 @@ flags mark the ones that need attention, above all **high-score districts with n
 | `housing_sales_monthly.csv` | 35,028 | TÜİK MEDAS "İlçe Konut Satış Sayıları" | 973 districts × 36 months (Jan 2023 – Dec 2025) |
 | `district_points.csv` | 973 | Open-source district centres (`nejdetkadir/turkish_cities`), checked against province polygons | Bubble position on the map |
 | `provinces.geojson` | 81 | `alpers/Turkey-Maps-GeoJSON`, simplified | Map background outlines |
-| `stores_dummy.csv` | 3,391 | **Dummy (generated, seed 449)** by `scripts/make_stores.py` | Arçelik / Beko stores; 3,069 active on 2026-10 |
+| `stores_dummy.csv` | 3,391 | **Dummy (generated, seed 449)** by `scripts/make_stores.py` | Arçelik stores; 3,069 active on 2026-10 |
 | `district_metrics_2025.csv` | 973 | `scripts/metrics.py` | **Reference output.** The dashboard must reproduce it (section 10) |
 | `raw/` | – | Original downloads (MEDAS exports, SEGE-2022 PDF) | Kept for reproducibility |
 
@@ -70,7 +72,7 @@ flags mark the ones that need attention, above all **high-score districts with n
 | `housing_data` | `TÜİK`, or `missing (0)` for the 18 districts TÜİK does not publish |
 | `sege_rank`, `sege_score`, `sege_kademe` | SEGE-2022 district development rank (1 = most developed), index score, tier 1–6 |
 
-**`stores_dummy.csv` columns:** `store_id`, `brand` (Arçelik / Beko), `format` (Bayi = dealer,
+**`stores_dummy.csv` columns:** `store_id`, `brand` (always Arçelik), `format` (Bayi = dealer,
 Mağaza = own store, AVM = mall shop), `il`, `ilce`, `tuik_code`, `open_month` (YYYY-MM),
 `close_month` (blank = still open), `size_m2`, `lat`, `lon` (district centre ± small jitter).
 A store is **active in month M** if `open_month ≤ M` and (`close_month` blank or `close_month > M`).
@@ -102,7 +104,7 @@ the selected **store month M** (default 2026-10).
 
 | Metric | Formula |
 |---|---|
-| Active stores | Count of stores active in M that pass the brand and format filters |
+| Active stores | Count of stores active in M that pass the format filter |
 | Stores per 100k households | `stores / households_Y × 100,000` |
 | Housing sales per 1k households | `housing_sales_Y / households_Y × 1,000` |
 | Housing YoY % | `housing_sales_Y / housing_sales_(Y−1) − 1` (blank for 2023, or if the prior year is 0) |
@@ -155,10 +157,10 @@ Navigation: a left sidebar with four pages, the filter bar on top of pages 1–3
 with a one-line **"How to read this"** note (text below).
 
 **Filters (global, kept in the URL hash):** Region (12) · Province (81, narrowed by region) ·
-SEGE tier (1–6) · Brand (All / Arçelik / Beko) · Store format (All / Bayi / Mağaza / AVM) ·
+SEGE tier (1–6) · Store format (All / Bayi / Mağaza / AVM) ·
 Year Y (2023 / 2024 / 2025) · Store month M (month slider, 2023-01 … 2026-10). A "Reset filters"
-button. Region, province and tier filter which districts are shown and summed in KPIs; brand,
-format and month change which stores count.
+button. Region, province and tier filter which districts are shown and summed in KPIs; format
+and month change which stores count.
 
 ### Page 1 · Overview
 
@@ -197,7 +199,7 @@ which stores serve it today."
 - **Score bars:** the three components (percentiles) and the weighted total
 - 36-month housing-sales line for this district, with its province's average district as a
   dashed line
-- Store list (brand, format, opened, size) and a peer table: the other districts of the same
+- Store list (store, format, opened, size) and a peer table: the other districts of the same
   province with score, stores and flags
 - District picker with search (also reachable as `#/district/<tuik_code>`)
 
@@ -266,7 +268,7 @@ to hand in a link. No scheduled job is needed: the data does not refresh.
   rows with `district_metrics_2025.csv`. Also run `python scripts/metrics.py data 2024` and
   compare the 2024 view
 - **Filter test** (Playwright): pick region TR1 İstanbul → KPIs equal the sums over İstanbul's 39
-  districts; brand = Beko → active stores = Beko rows active in 2026-10
+  districts; format = AVM → active stores = AVM rows active in 2026-10
 - **UI test:** 4 pages × EN/TR × 1280/390 px screenshots, no console errors, no network requests
 - If a check fails, find the cause and report it; never edit the expected numbers to pass
 

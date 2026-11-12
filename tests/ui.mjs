@@ -26,7 +26,6 @@ function expected(f) {
   const y = f.y || 2025, m = f.m || '2026-10';
   const act = new Map();
   for (const s of stores) {
-    if (f.b && s.brand !== f.b) continue;
     if (f.f && s.format !== f.f) continue;
     if (s.open_month <= m && (s.close_month === '' || s.close_month > m)) act.set(s.tuik_code, (act.get(s.tuik_code) || 0) + 1);
   }
@@ -80,9 +79,9 @@ ok(first.includes('Esenyurt') && first.includes('97.7'), 'rank 1 = İstanbul / E
 console.log('\n== filters (S2)');
 const combos = [
   { name: 'region TR1 İstanbul (via select)', f: { r: 'TR1' }, ui: async () => { await open('#/overview'); await page.selectOption('select[data-f="r"]', 'TR1'); } },
-  { name: 'brand Beko (via select)', f: { b: 'Beko' }, ui: async () => { await open('#/overview'); await page.selectOption('select[data-f="b"]', 'Beko'); } },
+  { name: 'format AVM (via select)', f: { f: 'AVM' }, ui: async () => { await open('#/overview'); await page.selectOption('select[data-f="f"]', 'AVM'); } },
   { name: 'province Ankara', f: { p: 'Ankara' } },
-  { name: 'SEGE tier 2 + Arçelik', f: { t: '2', b: 'Arçelik' } },
+  { name: 'SEGE tier 2 + dealers', f: { t: '2', f: 'Bayi' } },
   { name: 'format AVM, stores as of 2024-06', f: { f: 'AVM', m: '2024-06' } },
   { name: 'year 2024', f: { y: 2024 } },
   { name: 'month slider to 2023-01 (keyboard)', f: { m: '2023-01' }, ui: async () => { await open('#/overview'); await page.focus('input[data-f="m"]'); await page.keyboard.press('Home'); await page.waitForTimeout(200); } },
@@ -137,6 +136,111 @@ ok((await page.textContent('.dname')) === 'Esenyurt', '#/district/2053 opens Ese
 await open('#/ranking?y=2023');
 ok((await page.$('.note')) !== null && (await page.$$eval('.chip b', e => e[2].textContent)) === '–', '2023: housing boom shown as empty with a note');
 
+// ---------- usability: empty states, notices, filter chips, map, navigation
+console.log('\n== usability');
+await open('#/overview?p=%C4%B0stanbul&t=3');
+ok(await page.isVisible('.empty-state') && (await page.$$('.kpi')).length === 0, 'İstanbul + tier 3: empty state instead of an empty map');
+await page.click('.empty-state [data-k="t"]');
+await page.waitForTimeout(150);
+k = await kpis();
+const scope = await page.textContent('.ctx-scope');
+ok(toNum(k[0]) === expected({ p: 'İstanbul' }).stores && scope.includes('39'), '  "remove tier" suggestion -> İstanbul, 39 districts', `${k[0]} / ${scope}`);
+await open('#/ranking?p=%C4%B0stanbul&t=3');
+ok(await page.isVisible('.empty-state'), 'ranking page shows the same empty state');
+await open('#/overview?p=Hakkari&f=AVM');
+ok(await page.isVisible('.notice') && toNum((await kpis())[0]) === 0, 'Hakkari + mall shops: "no active store" notice');
+await page.click('.notice [data-k="f"]');
+await page.waitForTimeout(150);
+k = await kpis();
+ok(toNum(k[0]) === expected({ p: 'Hakkari' }).stores && !(await page.$('.notice')), '  "show all formats" -> Hakkari stores, notice gone', k[0]);
+await open('#/overview?r=TR1&f=AVM');
+await page.click('.context .fchip[data-k="f"]');
+await page.waitForTimeout(150);
+ok(toNum((await kpis())[0]) === expected({ r: 'TR1' }).stores, 'removing the mall-shop chip in the context bar -> all İstanbul stores');
+// Beko is gone: no brand filter, and an old link with b=Beko shows the default view
+await open('#/overview?b=Beko');
+ok(!(await page.$('select[data-f="b"]')) && toNum((await kpis())[0]) === 3069 && !(await page.textContent('body')).includes('Beko'),
+  'no brand filter and no "Beko" anywhere; an old ?b=Beko link shows all 3,069 stores');
+ok(stores.every(s => s.brand === 'Arçelik'), 'stores_dummy.csv: every row is Arçelik');
+await open('#/overview');
+ok((await page.textContent('.opp-list li:first-child')).includes('Atakum'), 'opportunities list starts with Atakum (rank-9 white space)');
+await page.click('.kpi.alert a');
+await page.waitForSelector('#tbl table');
+ok(toNum(await page.textContent('#tbl .tools .muted')) === 30, 'white-space KPI "view list" -> ranking filtered to 30');
+await open('#/overview');
+await page.evaluate(() => document.getElementById('ch-map').scrollIntoView({ block: 'center' }));
+const px = await page.evaluate(() => {
+  const c = echarts.getInstanceByDom(document.getElementById('ch-map'));
+  const r = document.getElementById('ch-map').getBoundingClientRect();
+  const q = c.convertToPixel({ geoIndex: 0 }, [33.35, 38.8]); // Tuz Gölü: inside provinces, away from district centres
+  return [r.left + q[0], r.top + q[1]];
+});
+await page.mouse.click(px[0], px[1]);
+await page.waitForTimeout(200);
+const picked = await page.evaluate(() => window.__ws.state().p);
+ok(['Konya', 'Aksaray', 'Ankara'].includes(picked) && (await page.isVisible('.context .fchip[data-k="p"]')), 'clicking a province on the map filters to it', picked);
+await open('#/district/2053');
+await page.click('.stepper a');
+await page.waitForTimeout(150);
+ok((await page.textContent('.dname')) === 'Nilüfer', 'district page "#2 ›" goes to the rank-2 district');
+await open('#/overview', 'en', 390);
+const hiddenBefore = !(await page.isVisible('select[data-f="r"]'));
+await page.click('.ftoggle');
+ok(hiddenBefore && await page.isVisible('select[data-f="r"]'), 'phone: filters collapse behind a "Filters" button and open on tap');
+await open('#/ranking');
+await page.fill('#search', 'zzzz');
+await page.waitForTimeout(100);
+ok(await page.isVisible('[data-act="clearq"]'), 'empty search shows a "clear search" button');
+await page.click('[data-act="clearq"]');
+await page.waitForTimeout(100);
+ok(toNum(await page.textContent('#tbl .tools .muted')) === 973, '  ...which restores all 973 rows');
+
+// several flags at once (any / all) + store quick filter, chart and table agree
+const has = (d, f) => d[`flag_${f}`] === 'True';
+const union = districts.filter(d => has(d, 'white_space') || has(d, 'housing_boom')).length;
+const inter = districts.filter(d => has(d, 'white_space') && has(d, 'housing_boom')).length;
+const usNoStore = districts.filter(d => has(d, 'under_served') && +d.stores === 0).length;
+await open('#/ranking');
+await page.click('.chip.flag-white_space');
+await page.click('.chip.flag-housing_boom');
+await page.waitForTimeout(150);
+const rowsN = async () => toNum(await page.textContent('#tbl .tools .muted'));
+const topN = async () => page.evaluate(() => { const el = document.getElementById('ch-top'); return el ? echarts.getInstanceByDom(el).getOption().series[0].data.length : 0; });
+ok(await rowsN() === inter && await topN() === Math.min(20, inter) && decodeURIComponent(await page.evaluate(() => location.hash)).includes('flag=white_space,housing_boom'),
+  `white space + housing boom (default AND): only the ${inter} districts with both flags, chart agrees, kept in the URL`, `${await rowsN()} / ${await topN()}`);
+const bothFlags = await page.$$eval('#tbl tbody tr', trs => trs.every(tr => tr.querySelector('.flag-white_space') && tr.querySelector('.flag-housing_boom')));
+ok(bothFlags, '  ...every listed row carries both flags');
+await page.click('[data-act="fm"][data-v="any"]');
+await page.waitForTimeout(150);
+ok(await rowsN() === union, `  ...switch to OR: ${union} rows`, String(await rowsN()));
+await page.click('[data-act="clearflags"]');
+await page.click('.chip.flag-white_space');
+await page.click('.chip.flag-under_served');
+await page.waitForTimeout(150);
+ok(await rowsN() === 0 && await page.isVisible('.notice.conflict'), 'white space + under-served (AND): 0 rows, with a note that they never co-occur');
+await page.click('.notice.conflict [data-act="fm"]');
+await page.waitForTimeout(150);
+const wsOrUs = districts.filter(d => has(d, 'white_space') || has(d, 'under_served')).length;
+ok(await rowsN() === wsOrUs && !(await page.$('.notice.conflict')), `  ...its "any of these" button -> ${wsOrUs} rows`, String(await rowsN()));
+await page.click('[data-act="clearflags"]');
+await page.click('.chip.flag-under_served');
+await page.click('[data-act="sf"][data-v="0"]');
+await page.waitForTimeout(150);
+ok(await rowsN() === usNoStore && (await page.isVisible('#tbl [data-act="clearflags"]')), `under-served + "no store" -> ${usNoStore} rows with a clear button`, String(await rowsN()));
+await page.click('#tbl [data-act="clearflags"]');
+await page.waitForTimeout(150);
+ok(await rowsN() === 973, '  clear -> all 973 rows');
+// the map keeps Türkiye's proportions (no stretch) at both widths
+for (const width of [1280, 390]) {
+  await open('#/overview', 'en', width);
+  const ratio = await page.evaluate(() => {
+    const c = echarts.getInstanceByDom(document.getElementById('ch-map'));
+    const a = c.convertToPixel({ geoIndex: 0 }, [26, 36]), b = c.convertToPixel({ geoIndex: 0 }, [45, 42]);
+    return Math.abs(b[0] - a[0]) / Math.abs(b[1] - a[1]);   // drawn width / height of a 19° × 6° box
+  });
+  ok(Math.abs(ratio - 19 / 6 * 0.78) < 0.05, `map at ${width}px keeps its aspect ratio (${(19 / 6 * 0.78).toFixed(2)})`, ratio.toFixed(2));
+}
+
 // ---------- S3-S5: pages x languages x widths; offline, no errors, no horizontal scroll, how-to + tooltips
 console.log('\n== pages x EN/TR x 1280/390 (S3-S5)');
 for (const lang of ['en', 'tr']) for (const width of [1280, 390]) for (const p of ['overview', 'ranking', 'district/2053', 'method']) {
@@ -148,6 +252,9 @@ for (const lang of ['en', 'tr']) for (const width of [1280, 390]) for (const p o
   const name = `${p.split('/')[0]}_${lang}_${width}.png`;
   await page.screenshot({ path: path.join(SHOTS, name), fullPage: true });
   ok(scroll <= 0 && howto === 1 && tips && lhtml === lang, `${name}: no h-scroll, how-to note, KPI tooltips, lang=${lang}`, `scroll ${scroll}, howto ${howto}, tips ${tips}, lang ${lhtml}`);
+}
+for (const [hash, name] of [['#/overview?p=%C4%B0stanbul&t=3', 'empty'], ['#/overview?p=Hakkari&f=AVM', 'nostore'], ['#/overview?r=TR5', 'region']]) {
+  for (const width of [1280, 390]) { await open(hash, 'tr', width); await page.screenshot({ path: path.join(SHOTS, `state_${name}_tr_${width}.png`), fullPage: true }); }
 }
 const trSample = await (async () => { await open('#/overview', 'tr'); return (await kpis())[5]; })();
 ok(trSample === '1.760.292', 'Turkish number format (1.760.292)', trSample);

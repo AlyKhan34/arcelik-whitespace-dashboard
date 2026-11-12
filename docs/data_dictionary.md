@@ -13,7 +13,7 @@ joins everything is `tuik_code`, the TÜİK district code. **The store file is d
 | `housing_sales_monthly.csv` | 35,028 | TÜİK MEDAS "İlçe Konut Satış Sayıları" | 973 districts × 36 months (Jan 2023 – Dec 2025) |
 | `district_points.csv` | 973 | Open-source district centres (`nejdetkadir/turkish_cities`), checked against province polygons | Bubble position on the map |
 | `provinces.geojson` | 81 | `alpers/Turkey-Maps-GeoJSON`, simplified | Map background outlines; `properties.name` = province |
-| `stores_dummy.csv` | 3,391 | **Dummy, generated (seed 449)** by `scripts/make_stores.py` | Arçelik / Beko stores; 3,069 active in Oct 2026 |
+| `stores_dummy.csv` | 3,391 | **Dummy, generated (seed 449)** by `scripts/make_stores.py` | Arçelik stores; 3,069 active in Oct 2026 |
 | `district_metrics_2025.csv` | 973 | `scripts/metrics.py` | Reference output of the score and flags (2025, all stores, Oct 2026) |
 | `raw/` | – | Original downloads (MEDAS exports, SEGE-2022 PDF) | Kept for reproducibility |
 
@@ -56,7 +56,7 @@ joins everything is `tuik_code`, the TÜİK district code. **The store file is d
 | Column | Type | Meaning |
 |---|---|---|
 | `store_id` | text | `ST00001` … |
-| `brand` | text | `Arçelik` or `Beko` |
+| `brand` | text | Always `Arçelik` (Beko removed in Nov 2026; kept so a real list can be dropped in) |
 | `format` | text | `Bayi` (dealer), `Mağaza` (own store), `AVM` (mall shop) |
 | `il`, `ilce`, `tuik_code` | | District the store is in |
 | `open_month` | text | `YYYY-MM` the store opened |

@@ -35,12 +35,11 @@
     return out;
   }
 
-  /* Count stores active in month m (int) per district, after brand / format filters.
-   * brand, format: index into DATA.brands / DATA.formats, or -1 for all. */
-  function activeStores(data, m, brand, format) {
+  /* Count stores active in month m (int) per district, after the format filter.
+   * format: index into DATA.formats, or -1 for all. */
+  function activeStores(data, m, format) {
     const st = data.stores, n = data.districts.code.length, out = new Int32Array(n);
     for (let k = 0; k < st.id.length; k++) {
-      if (brand >= 0 && st.brand[k] !== brand) continue;
       if (format >= 0 && st.format[k] !== format) continue;
       if (st.open[k] <= m && (st.close[k] === null || st.close[k] > m)) out[st.district[k]]++;
     }
@@ -73,12 +72,12 @@
     return { year, hh, hs, prev: prev || null, housingPer1k, yoy, pH, pI, pS, score, rank, order };
   }
 
-  /* Full metrics for one view. opts: {year, month ('YYYY-MM'), brand, format, weights}. */
+  /* Full metrics for one view. opts: {year, month ('YYYY-MM'), format, weights}. */
   function compute(data, opts, cachedDemand) {
     const cfg = data.config.flags;
     const dem = cachedDemand || demand(data, opts.year, opts.weights);
     const n = data.districts.code.length;
-    const stores = activeStores(data, monthInt(opts.month), opts.brand, opts.format);
+    const stores = activeStores(data, monthInt(opts.month), opts.format);
     let sumStores = 0, sumHH = 0;
     for (let i = 0; i < n; i++) { sumStores += stores[i]; sumHH += dem.hh[i]; }
     const national = sumStores / sumHH * 1e5;    // over all 973 districts, never the filtered ones
