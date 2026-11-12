@@ -1,5 +1,19 @@
-node_modules/
-__pycache__/
+# macOS
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Test output (Playwright screenshots and reports)
 tests/screenshots/
+test-results/
+playwright-report/
+
+# Generated hand-in archive (rebuild with: npm run handin)
 dist/whitespace_data.zip
