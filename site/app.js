@@ -301,6 +301,10 @@
     const row = e.target.closest('tr[data-code]');
     if (row && !e.target.closest('a')) go('district', +row.dataset.code);
   });
+  document.addEventListener('keydown', (e) => {
+    const row = e.target.closest && e.target.closest('tr[data-code]');
+    if (row && e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go('district', +row.dataset.code); }
+  });
 
   // ------------------------------------------------------------------ building blocks
   function howTo(key) { return `<p class="howto"><b>${t('howto')}</b> ${esc(t(key))}</p>`; }
@@ -678,7 +682,8 @@
         <div class="picker"><label for="pick" class="sr">${esc(t('pick'))}</label><span class="pick-ico" aria-hidden="true">⌕</span><input id="pick" list="pick-list" placeholder="${esc(t('pick_ph'))}" autocomplete="off"><datalist id="pick-list">${opts}</datalist></div>
         <span class="stepper">${prevNext(res, i)}</span>
       </div>
-      ${howTo('howto_district')}
+      <p class="pick-msg" id="pick-msg" role="status"></p>
+      ${contextBar(v)}${howTo('howto_district')}
       <header class="dhead"><div><h2 class="dname">${esc(D.ilce[i])}</h2><div class="dsub">${esc(D.il[i])} · ${esc(DATA.regions[D.region[i]])} · <b>${esc(t('rank_of', { r: res.rank[i], n: N }))}</b> · ${esc(t('score'))} <b>${fDec(res.score[i], 1)}</b></div></div>
         <ul class="dflags">${fl.length ? fl.map(x => `<li><span class="flag flag-${x}">${flagLabel(x)}</span> <span class="muted">${esc(ruleText(x))}</span></li>`).join('') : `<li class="muted">${esc(t('no_flags_long'))}</li>`}</ul></header>
       ${hiddenNote}
@@ -692,7 +697,23 @@
         ${card(t('peers_title', { p: D.il[i] }), peerTbl)}
       </div>`;
     const pick = document.getElementById('pick');
-    pick.addEventListener('change', () => { const j = D.il.findIndex((_, k) => dname(k) === pick.value); if (j >= 0) go('district', D.code[j]); });
+    const norm = (x) => x.toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
+    const exact = () => { const q = norm(pick.value); return D.il.findIndex((_, k) => norm(dname(k)) === q); };
+    const findPick = () => {
+      const q = norm(pick.value); if (!q) return -1;
+      const j = exact(); if (j >= 0) return j;
+      const hits = res.order.filter(k => norm(D.ilce[k]) === q);                       // "çankaya" -> Ankara / Çankaya
+      if (hits.length) return hits[0];
+      const part = res.order.filter(k => norm(dname(k)).includes(q));                  // "kadık" -> İstanbul / Kadıköy
+      return part.length ? part[0] : -1;
+    };
+    pick.addEventListener('input', () => { document.getElementById('pick-msg').textContent = ''; const j = exact(); if (j >= 0) go('district', D.code[j]); });
+    pick.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const j = findPick();
+      if (j >= 0) go('district', D.code[j]); else document.getElementById('pick-msg').textContent = t('pick_none', { q: pick.value });
+    });
     // score bars
     const comps = [[t('comp_households'), res.pH[i], S.w[0], C.mid.households], [t('comp_income'), res.pI[i], S.w[1], C.mid.income], [t('comp_housing'), res.pS[i], S.w[2], C.mid.housing]];
     chart(document.getElementById('ch-score'), {

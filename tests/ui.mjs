@@ -195,6 +195,28 @@ await page.click('[data-act="clearq"]');
 await page.waitForTimeout(100);
 ok(toNum(await page.textContent('#tbl .tools .muted')) === 973, '  ...which restores all 973 rows');
 
+// keyboard: Enter on a focused table row opens that district
+await open('#/ranking');
+await page.focus('#tbl tbody tr:first-child');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(200);
+ok((await page.evaluate(() => window.__ws.state().page)) === 'district' && (await page.textContent('.dname')) === 'Esenyurt', 'Enter on a focused ranking row opens the district');
+// district search: exact pick opens at once, a partial name + Enter takes the best match, no match says so
+const pickTo = async (text, enter) => {
+  await open('#/district/2053');
+  await page.fill('#pick', text);
+  if (enter) await page.press('#pick', 'Enter');
+  await page.waitForTimeout(200);
+};
+await pickTo('Ankara / Çankaya', false);
+ok((await page.textContent('.dname')) === 'Çankaya', 'district search: picking "Ankara / Çankaya" opens it without Enter');
+await pickTo('kadık', true);
+ok((await page.textContent('.dname')) === 'Kadıköy', 'district search: "kadık" + Enter opens Kadıköy');
+await pickTo('zzzz', true);
+ok((await page.textContent('#pick-msg')).includes('zzzz') && (await page.textContent('.dname')) === 'Esenyurt', 'district search: no match shows a message and stays put');
+await open('#/district/2053?w=60-20-20&r=TR1');
+ok(await page.isVisible('.context .fchip[data-k="w"]') && await page.isVisible('.context .fchip[data-k="r"]'), 'district page shows the active filters and weights');
+
 // score weights: mouse drag works, and the new weights follow you to every page
 await open('#/method');
 {

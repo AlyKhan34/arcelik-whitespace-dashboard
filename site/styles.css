@@ -175,6 +175,8 @@ tr.current { background: #fff7e0; }
 .pick-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .picker input { font: inherit; padding: 8px 10px 8px 30px; border: 1px solid #c9c7c1; border-radius: 8px; width: 100%; background: #fff; }
 .picker input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.pick-msg { margin: -6px 0 8px; font-size: 13px; color: var(--neg); }
+.pick-msg:empty { display: none; }
 .stepper { display: inline-flex; gap: 8px; align-items: center; font-size: 12px; }
 .dhead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; margin-bottom: 14px; }
 .dname { font-size: 26px; margin: 0; }

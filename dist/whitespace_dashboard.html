@@ -183,6 +183,8 @@ tr.current { background: #fff7e0; }
 .pick-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .picker input { font: inherit; padding: 8px 10px 8px 30px; border: 1px solid #c9c7c1; border-radius: 8px; width: 100%; background: #fff; }
 .picker input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.pick-msg { margin: -6px 0 8px; font-size: 13px; color: var(--neg); }
+.pick-msg:empty { display: none; }
 .stepper { display: inline-flex; gap: 8px; align-items: center; font-size: 12px; }
 .dhead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; margin-bottom: 14px; }
 .dname { font-size: 26px; margin: 0; }
@@ -326,6 +328,7 @@ window.WS_I18N = {
     rf_hint: 'Tip: select several flags to see only the districts that carry all of them; the chart and the table follow your selection.',
     rf_match: 'Match', rf_any: 'Any of them (OR)', rf_all: 'All of them (AND)', rf_nostore: 'No store', rf_store: 'With store',
     weights_chip: 'Score weights', weights_applied: 'Applied: score, ranks and flags on every page use these weights (also kept in the link).', weights_default: 'Default weights 40 / 30 / 30.',
+    pick_none: 'No district matches "{q}". Try a district or province name, e.g. Kadıköy.',
     filters_btn: 'Filters', turkiye: 'Türkiye', remove_filter: 'Remove this filter',
     ctx_all: 'Showing <b>all {n} districts</b>', ctx_some: 'Showing <b>{n} of {N} districts</b>', ctx_hint: 'Use the filters, or click a province on the map, to narrow down.',
     empty_title: 'No district matches these filters', empty_text: 'There is no district with {f}. Remove one of the filters below to see results.',
@@ -429,6 +432,7 @@ window.WS_I18N = {
     rf_hint: 'İpucu: birden fazla bayrak seçince yalnızca hepsini birden taşıyan ilçeler kalır; grafik ve tablo seçiminize göre değişir.',
     rf_match: 'Eşleşme', rf_any: 'Herhangi biri (VEYA)', rf_all: 'Hepsi (VE)', rf_nostore: 'Mağaza yok', rf_store: 'Mağaza var',
     weights_chip: 'Skor ağırlıkları', weights_applied: 'Uygulandı: tüm sayfalardaki skor, sıralama ve bayraklar bu ağırlıkları kullanıyor (linkte de saklanır).', weights_default: 'Varsayılan ağırlıklar 40 / 30 / 30.',
+    pick_none: '"{q}" ile eşleşen ilçe yok. Bir ilçe ya da il adı deneyin, ör. Kadıköy.',
     filters_btn: 'Filtreler', turkiye: 'Türkiye', remove_filter: 'Bu filtreyi kaldır',
     ctx_all: '<b>{n} ilçenin tamamı</b> gösteriliyor', ctx_some: '<b>{N} ilçeden {n}</b> gösteriliyor', ctx_hint: 'Daraltmak için filtreleri kullanın ya da haritada bir ile tıklayın.',
     empty_title: 'Bu filtrelere uyan ilçe yok', empty_text: '{f} kriterine uyan ilçe yok. Sonuç görmek için aşağıdaki filtrelerden birini kaldırın.',
@@ -933,6 +937,10 @@ window.WS_I18N = {
     const row = e.target.closest('tr[data-code]');
     if (row && !e.target.closest('a')) go('district', +row.dataset.code);
   });
+  document.addEventListener('keydown', (e) => {
+    const row = e.target.closest && e.target.closest('tr[data-code]');
+    if (row && e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go('district', +row.dataset.code); }
+  });
 
   // ------------------------------------------------------------------ building blocks
   function howTo(key) { return `<p class="howto"><b>${t('howto')}</b> ${esc(t(key))}</p>`; }
@@ -1310,7 +1318,8 @@ window.WS_I18N = {
         <div class="picker"><label for="pick" class="sr">${esc(t('pick'))}</label><span class="pick-ico" aria-hidden="true">⌕</span><input id="pick" list="pick-list" placeholder="${esc(t('pick_ph'))}" autocomplete="off"><datalist id="pick-list">${opts}</datalist></div>
         <span class="stepper">${prevNext(res, i)}</span>
       </div>
-      ${howTo('howto_district')}
+      <p class="pick-msg" id="pick-msg" role="status"></p>
+      ${contextBar(v)}${howTo('howto_district')}
       <header class="dhead"><div><h2 class="dname">${esc(D.ilce[i])}</h2><div class="dsub">${esc(D.il[i])} · ${esc(DATA.regions[D.region[i]])} · <b>${esc(t('rank_of', { r: res.rank[i], n: N }))}</b> · ${esc(t('score'))} <b>${fDec(res.score[i], 1)}</b></div></div>
         <ul class="dflags">${fl.length ? fl.map(x => `<li><span class="flag flag-${x}">${flagLabel(x)}</span> <span class="muted">${esc(ruleText(x))}</span></li>`).join('') : `<li class="muted">${esc(t('no_flags_long'))}</li>`}</ul></header>
       ${hiddenNote}
@@ -1324,7 +1333,23 @@ window.WS_I18N = {
         ${card(t('peers_title', { p: D.il[i] }), peerTbl)}
       </div>`;
     const pick = document.getElementById('pick');
-    pick.addEventListener('change', () => { const j = D.il.findIndex((_, k) => dname(k) === pick.value); if (j >= 0) go('district', D.code[j]); });
+    const norm = (x) => x.toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
+    const exact = () => { const q = norm(pick.value); return D.il.findIndex((_, k) => norm(dname(k)) === q); };
+    const findPick = () => {
+      const q = norm(pick.value); if (!q) return -1;
+      const j = exact(); if (j >= 0) return j;
+      const hits = res.order.filter(k => norm(D.ilce[k]) === q);                       // "çankaya" -> Ankara / Çankaya
+      if (hits.length) return hits[0];
+      const part = res.order.filter(k => norm(dname(k)).includes(q));                  // "kadık" -> İstanbul / Kadıköy
+      return part.length ? part[0] : -1;
+    };
+    pick.addEventListener('input', () => { document.getElementById('pick-msg').textContent = ''; const j = exact(); if (j >= 0) go('district', D.code[j]); });
+    pick.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const j = findPick();
+      if (j >= 0) go('district', D.code[j]); else document.getElementById('pick-msg').textContent = t('pick_none', { q: pick.value });
+    });
     // score bars
     const comps = [[t('comp_households'), res.pH[i], S.w[0], C.mid.households], [t('comp_income'), res.pI[i], S.w[1], C.mid.income], [t('comp_housing'), res.pS[i], S.w[2], C.mid.housing]];
     chart(document.getElementById('ch-score'), {
