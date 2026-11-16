@@ -195,6 +195,34 @@ await page.click('[data-act="clearq"]');
 await page.waitForTimeout(100);
 ok(toNum(await page.textContent('#tbl .tools .muted')) === 973, '  ...which restores all 973 rows');
 
+// score weights: mouse drag works, and the new weights follow you to every page
+await open('#/method');
+{
+  const box = await (await page.$('[data-w="0"]')).boundingBox();
+  const x0 = box.x + box.width * 0.40, x1 = box.x + box.width * 0.80, yy = box.y + box.height / 2;
+  await page.mouse.move(x0, yy); await page.mouse.down();
+  for (let k = 1; k <= 10; k++) { await page.mouse.move(x0 + (x1 - x0) * k / 10, yy); await page.waitForTimeout(30); }
+  await page.mouse.up(); await page.waitForTimeout(200);
+}
+const wNow = await page.evaluate(() => window.__ws.state().w.join('/'));
+ok(wNow === '80/10/10', 'dragging the households slider from 40% to 80% gives 80 / 10 / 10 (others keep their 30:30 ratio)', wNow);
+ok((await page.textContent('#wformula')).includes('80%'), '  ...the formula text updates while dragging');
+await page.focus('[data-w="0"]');
+for (let k = 0; k < 4; k++) await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(200);
+const topHH = districts.reduce((a, b) => (+b.households_2025 > +a.households_2025 ? b : a));
+await page.click('#nav a[href^="#/ranking"]');
+await page.waitForSelector('#tbl table');
+ok((await page.textContent('#tbl tbody tr:first-child')).includes(topHH.ilce) && await page.isVisible('.context .fchip[data-k="w"]'),
+  `weights 100/0/0, then the sidebar link to Ranking: rank 1 = ${topHH.ilce} (most households) and a weights chip is shown`);
+await page.click('#nav a[href^="#/overview"]');
+await page.waitForTimeout(200);
+ok(decodeURIComponent(await page.evaluate(() => location.hash)).includes('w=100-0-0'), '  ...the Overview link keeps the weights too');
+await page.click('.context .fchip[data-k="w"]');
+await page.waitForTimeout(200);
+ok(await page.evaluate(() => window.__ws.state().w.join('/')) === '40/30/30' && (await page.textContent('.opp-list li:first-child')).includes('Atakum'),
+  '  removing the weights chip restores 40 / 30 / 30');
+
 // several flags at once (any / all) + store quick filter, chart and table agree
 const has = (d, f) => d[`flag_${f}`] === 'True';
 const union = districts.filter(d => has(d, 'white_space') || has(d, 'housing_boom')).length;

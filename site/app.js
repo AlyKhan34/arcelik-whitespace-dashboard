@@ -101,6 +101,7 @@
   function hashFor(page, district, st = S) { return '#/' + page + (page === 'district' && district ? '/' + district : '') + query(st); }
   function writeHash(push) {
     const h = hashFor(S.page, S.district);
+    renderNav();
     if (h === location.hash) return;
     lastHash = h;
     if (push) { location.hash = h; return; }
@@ -151,9 +152,10 @@
     if (st.f) out.push({ k: 'f', label: t('f_format'), value: t('fmt_' + st.f) });
     if (st.y !== DEF.y) out.push({ k: 'y', label: t('f_year'), value: String(st.y) });
     if (st.m !== DEF.m) out.push({ k: 'm', label: t('f_month'), value: fMonth(M.monthInt(st.m)) });
+    if (st.w.join() !== DEF.w.join()) out.push({ k: 'w', label: t('weights_chip'), value: st.w.join(' / ') });
     return out;
   }
-  const unsetPatch = (k) => ({ [k]: k === 'y' ? DEF.y : k === 'm' ? DEF.m : '' });
+  const unsetPatch = (k) => ({ [k]: k === 'y' ? DEF.y : k === 'm' ? DEF.m : k === 'w' ? DEF.w.slice() : '' });
   function countDistricts(st) {
     const rIdx = st.r ? REGION_CODE.indexOf(st.r) : -1;
     let n = 0;
@@ -172,7 +174,7 @@
     const chips = activeFilters().map(a => `<button type="button" class="fchip" data-act="unset" data-k="${a.k}" title="${esc(t('remove_filter'))}">
       <span class="muted">${esc(a.label)}:</span> ${esc(a.value)} <span aria-hidden="true">✕</span><span class="sr">${esc(t('remove_filter'))}</span></button>`).join('');
     const scope = v.idx.length === N ? t('ctx_all', { n: fInt(N) }) : t('ctx_some', { n: fInt(v.idx.length), N: fInt(N) });
-    return `<div class="context" role="status"><span class="ctx-scope">${scope}</span>${chips}${chips ? `<button type="button" class="fchip clear" data-act="reset">${esc(t('reset'))}</button>` : `<span class="muted">${esc(t('ctx_hint'))}</span>`}</div>`;
+    return `<div class="context" role="status"><span class="ctx-scope">${scope}</span>${chips}${activeFilters().some(x => x.k !== 'w') ? `<button type="button" class="fchip clear" data-act="reset">${esc(t('reset'))}</button>` : `<span class="muted">${esc(t('ctx_hint'))}</span>`}</div>`;
   }
   function emptyState() {
     const act = activeFilters().filter(a => ['r', 'p', 't'].includes(a.k));
@@ -218,11 +220,14 @@
     document.documentElement.lang = LANG;
     document.title = t('app_title');
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
-    document.getElementById('nav').innerHTML = PAGES.map(p =>
-      `<a href="${hashFor(p, p === 'district' ? (S.district || topDistrict()) : null)}" class="${S.page === p ? 'active' : ''}" ${S.page === p ? 'aria-current="page"' : ''}><span class="ico" aria-hidden="true">${ICONS[p]}</span>${esc(t('nav_' + p))}</a>`).join('');
+    renderNav();
     document.querySelectorAll('.lang button').forEach(b => b.classList.toggle('active', b.dataset.lang === LANG));
     document.getElementById('foot').innerHTML = esc(t('footer', { built: DATA.built }));
     renderFilters();
+  }
+  function renderNav() {
+    document.getElementById('nav').innerHTML = PAGES.map(p =>
+      `<a href="${hashFor(p, p === 'district' ? (S.district || topDistrict()) : null)}" class="${S.page === p ? 'active' : ''}" ${S.page === p ? 'aria-current="page"' : ''}><span class="ico" aria-hidden="true">${ICONS[p]}</span>${esc(t('nav_' + p))}</a>`).join('');
   }
   function topDistrict() { return D.code[(demCache.v || M.demand(DATA, S.y, { households: S.w[0], income: S.w[1], housing: S.w[2] })).order[0]]; }
 
@@ -235,7 +240,7 @@
     const provs = provinces.filter(p => rIdx < 0 || provRegion.get(p) === rIdx);
     const mi = M.monthInt(S.m);
     const changed = S.r || S.p || S.t || S.f || S.y !== DEF.y || S.m !== DEF.m;
-    const nActive = activeFilters().length;
+    const nActive = activeFilters().filter(a => a.k !== 'w').length;   // the weights live on the Method page
     el.classList.toggle('open', ui.fopen);
     el.innerHTML = `
       <button type="button" class="ftoggle" data-act="ftoggle" aria-expanded="${ui.fopen}">☰ ${esc(t('filters_btn'))}${nActive ? ` <b class="badge">${nActive}</b>` : ''}<span aria-hidden="true">${ui.fopen ? '▴' : '▾'}</span></button>
@@ -734,28 +739,49 @@
       <div class="dummy">⚠ <b>${esc(t('dummy_title'))}</b> ${esc(t('dummy_text'))}</div>
       <div class="two">
         ${card(t('weights_title'), `<p>${esc(t('weights_text'))}</p><div class="weights">${sliders}</div>
-          <p class="wsum">${esc(t('weights_sum'))}: <b>100%</b> · ${esc(t('rank1_now', { d: dname(top), s: fDec(res.score[top], 1) }))}</p>
-          <button type="button" class="btn" data-act="wreset" ${isDef ? 'disabled' : ''}>${esc(t('weights_reset', { w: DEF.w.join(' / ') }))}</button>`)}
-        ${card(t('score_formula_title'), `<p class="formula">${esc(t('score_formula', { a: S.w[0], b: S.w[1], c: S.w[2] }))}</p><p>${esc(t('score_pct'))}</p><p class="muted">${esc(t('score_example'))}</p><p>${esc(t('score_filters'))}</p>`)}
+          <p class="wsum">${esc(t('weights_sum'))}: <b>100%</b> · <span id="wrank1">${esc(t('rank1_now', { d: dname(top), s: fDec(res.score[top], 1) }))}</span></p>
+          <p class="wapplied" id="wapplied">${esc(t(isDef ? 'weights_default' : 'weights_applied'))}</p>
+          <button type="button" class="btn" id="wreset" data-act="wreset" ${isDef ? 'disabled' : ''}>${esc(t('weights_reset', { w: DEF.w.join(' / ') }))}</button>`)}
+        ${card(t('score_formula_title'), `<p class="formula" id="wformula">${esc(t('score_formula', { a: S.w[0], b: S.w[1], c: S.w[2] }))}</p><p>${esc(t('score_pct'))}</p><p class="muted">${esc(t('score_example'))}</p><p>${esc(t('score_filters'))}</p>`)}
       </div>
       ${card(t('flags_title'), `<div class="tablewrap"><table><thead><tr><th>${t('c_flags')}</th><th>${t('rule')}</th><th class="num">${t('count_now')}</th></tr></thead><tbody>
-        ${FLAGS.map((f, k) => tr([`<span class="flag flag-${f}">${flagLabel(f)}</span>`, esc(ruleText(f)), `<span class="num">${f === 'housing_boom' && S.y === CFG.years[0] ? '–' : fInt(counts[k])}</span>`])).join('')}
+        ${FLAGS.map((f, k) => tr([`<span class="flag flag-${f}">${flagLabel(f)}</span>`, esc(ruleText(f)), `<span class="num" id="fc-${f}">${f === 'housing_boom' && S.y === CFG.years[0] ? '–' : fInt(counts[k])}</span>`])).join('')}
         </tbody></table></div><p class="muted">${esc(t('flags_note', { n: fDec(res.national, 2), y: S.y, m: fMonth(M.monthInt(S.m)) }))}</p>`)}
       ${card(t('metrics_title'), `<div class="tablewrap"><table><thead><tr><th>${t('metric')}</th><th>${t('formula')}</th></tr></thead><tbody>
         ${['m_stores', 'm_per100k', 'm_housing', 'm_yoy', 'm_national', 'm_coverage'].map(k => tr([esc(t(k)), `<code>${esc(t(k + '_f'))}</code>`])).join('')}</tbody></table></div>`)}
       ${card(t('sources_title'), `<div class="tablewrap"><table><thead><tr><th>${t('data')}</th><th>${t('source')}</th><th>${t('period')}</th></tr></thead><tbody>
         ${['src_pop', 'src_sales', 'src_sege', 'src_points', 'src_geo', 'src_stores'].map(k => tr([esc(t(k)), esc(t(k + '_s')), esc(t(k + '_p'))])).join('')}</tbody></table></div>`)}
       ${card(t('assumptions_title'), `<ol class="assume">${[1, 2, 3, 4, 5, 6].map(k => `<li>${esc(t('as' + k))}</li>`).join('')}</ol>`)}`;
-    document.querySelectorAll('[data-w]').forEach(inp => inp.addEventListener('input', () => {
-      const j = +inp.dataset.w, val = +inp.value, others = [0, 1, 2].filter(x => x !== j);
-      const rest = 100 - val, os = S.w[others[0]] + S.w[others[1]];
-      const w = S.w.slice(); w[j] = val;
-      const a = os === 0 ? Math.round(rest / 2 / 5) * 5 : Math.round(rest * S.w[others[0]] / os / 5) * 5;
-      w[others[0]] = a; w[others[1]] = rest - a;
-      S.w = w; writeHash(false);
-      if (rafPending) cancelAnimationFrame(rafPending);
-      rafPending = requestAnimationFrame(() => { rafPending = null; const y = window.scrollY; renderPage(); window.scrollTo(0, y); const n = document.querySelector(`[data-w="${j}"]`); if (n) n.focus(); });
-    }));
+    // While a slider moves, the other two share the rest in the proportions they had when the move
+    // started (so dragging to 100% and back restores them). The sliders themselves are never redrawn.
+    let base = null;
+    const start = () => { base = S.w.slice(); };
+    document.querySelectorAll('[data-w]').forEach(inp => {
+      inp.addEventListener('pointerdown', start);
+      inp.addEventListener('keydown', () => { if (!base) start(); });
+      inp.addEventListener('change', () => { base = null; });
+      inp.addEventListener('input', () => {
+        if (!base) start();
+        const j = +inp.dataset.w, val = +inp.value, others = [0, 1, 2].filter(x => x !== j);
+        const rest = 100 - val, os = base[others[0]] + base[others[1]];
+        const w = S.w.slice(); w[j] = val;
+        const a = os === 0 ? Math.round(rest / 2 / 5) * 5 : Math.round(rest * base[others[0]] / os / 5) * 5;
+        w[others[0]] = a; w[others[1]] = rest - a;
+        S.w = w; writeHash(false);
+        w.forEach((x, k) => { const el = document.querySelector(`[data-w="${k}"]`); if (k !== j && el) el.value = x; document.getElementById('wv' + k).textContent = x + '%'; });
+        if (rafPending) cancelAnimationFrame(rafPending);
+        rafPending = requestAnimationFrame(() => { rafPending = null; updateMethod(view()); });
+      });
+    });
+  }
+  function updateMethod(v) {
+    const { res } = v, top = res.order[0], isDef = S.w.join() === DEF.w.join();
+    lastView = v;
+    document.getElementById('wrank1').textContent = t('rank1_now', { d: dname(top), s: fDec(res.score[top], 1) });
+    document.getElementById('wformula').textContent = t('score_formula', { a: S.w[0], b: S.w[1], c: S.w[2] });
+    document.getElementById('wapplied').textContent = t(isDef ? 'weights_default' : 'weights_applied');
+    document.getElementById('wreset').disabled = isDef;
+    FLAGS.forEach(f => { const el = document.getElementById('fc-' + f); if (el && el.textContent !== '–') el.textContent = fInt(res.flags[f].filter(Boolean).length); });
   }
 
   // ------------------------------------------------------------------ render
